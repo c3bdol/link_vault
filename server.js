@@ -9,7 +9,9 @@ import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DB_PATH = path.join(__dirname, 'db.json');
+const DB_PATH = process.env.VERCEL
+  ? path.join('/tmp', 'db.json')
+  : path.join(__dirname, 'db.json');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -449,6 +451,10 @@ app.get('*', (req, res) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`⚔️ Link Vault API Server running at http://0.0.0.0:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`⚔️ Link Vault API Server running at http://0.0.0.0:${PORT}`);
+  });
+}
+
+export default app;
