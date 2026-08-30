@@ -1,0 +1,22 @@
+{
+  "name": "link-vault",
+  "version": "1.0.0",
+  "description": "Tokyo Night & Pixel-Art Link Organizer with OWASP Auto-Tagging",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "build": "cd client && npx vite build",
+    "dev:server": "node server.js",
+    "dev:client": "cd client && npx vite --host"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "vite": "^5.2.0"
+  }
+}

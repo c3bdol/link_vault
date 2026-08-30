@@ -1,0 +1,52 @@
+{
+  "links": [
+    {
+      "id": "init-web-1",
+      "url": "https://owasp.org/Top10/",
+      "title": "OWASP Top 10 Web Application Security Risks",
+      "description": "The OWASP Top 10 is a standard awareness document for developers and web application security.",
+      "image": "https://owasp.org/assets/images/logo.png",
+      "favicon": "https://owasp.org/favicon.ico",
+      "category": "web",
+      "tags": [
+        "Broken Access Control",
+        "Injection (XSS/SQLi)"
+      ],
+      "notes": "Essential reference for web penetration testing.",
+      "favorite": true,
+      "createdAt": "2026-08-30T10:00:00.000Z"
+    },
+    {
+      "id": "init-api-1",
+      "url": "https://owasp.org/www-project-api-security/",
+      "title": "OWASP API Security Top 10 2023",
+      "description": "OWASP API Security Top 10 focuses on the top vulnerabilities and security risks for modern REST APIs.",
+      "image": "https://owasp.org/assets/images/logo.png",
+      "favicon": "https://owasp.org/favicon.ico",
+      "category": "api",
+      "tags": [
+        "Broken Object Auth (BOLA)",
+        "Broken Auth"
+      ],
+      "notes": "BOLA and Broken Auth are the top API threats.",
+      "favorite": false,
+      "createdAt": "2026-08-30T10:05:00.000Z"
+    },
+    {
+      "id": "init-personal-1",
+      "url": "https://github.com/folke/tokyonight.nvim",
+      "title": "Tokyo Night Neovim / VS Code Color Scheme",
+      "description": "A clean, dark Neovim theme written in Lua, with support for LSP, Treesitter and many plugins.",
+      "image": "https://raw.githubusercontent.com/folke/tokyonight.nvim/main/assets/storm.png",
+      "favicon": "https://github.githubassets.com/favicons/favicon.png",
+      "category": "personal",
+      "tags": [
+        "Tool",
+        "Inspiration"
+      ],
+      "notes": "Inspiration for Tokyo Night Storm palette.",
+      "favorite": true,
+      "createdAt": "2026-08-30T10:10:00.000Z"
+    }
+  ]
+}

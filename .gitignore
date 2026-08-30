@@ -1,0 +1,14 @@
+# Database & Personal Data
+db.json
+
+# Dependencies
+node_modules/
+client/node_modules/
+
+# Production Build Output
+client/dist/
+
+# Environment & Logs
+.env
+*.log
+.DS_Store

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Link Vault — Pixel Art Link Organizer</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+  
+  <!-- NES.css Framework -->
+  <link href="https://unpkg.com/nes.css@2.3.0/css/nes.min.css" rel="stylesheet" />
+  
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-container container">
+        <div class="brand">
+          <svg class="vault-brand-logo" width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="20" height="20" rx="2" fill="#24283b" stroke="#7aa2f7" stroke-width="2"/>
+            <circle cx="12" cy="12" r="4" fill="#1a1b26" stroke="#e0af68" stroke-width="2"/>
+            <circle cx="12" cy="12" r="1.5" fill="#7dcfff"/>
+            <path d="M12 13.5V16.5" stroke="#e0af68" stroke-width="2" stroke-linecap="round"/>
+            <rect x="4" y="4" width="2" height="2" fill="#7aa2f7"/>
+            <rect x="18" y="4" width="2" height="2" fill="#7aa2f7"/>
+            <rect x="4" y="18" width="2" height="2" fill="#7aa2f7"/>
+            <rect x="18" y="18" width="2" height="2" fill="#7aa2f7"/>
+          </svg>
+          <h1 class="brand-title">LINK VAULT</h1>
+        </div>
+
+        <form id="add-link-form" class="add-link-form">
+          <div class="input-wrapper">
+            <input type="url" id="link-input" class="nes-input" placeholder="Paste link (https://...)" required autocomplete="off" />
+          </div>
+          <button type="submit" id="add-btn" class="nes-btn is-primary pixel-text">+ ADD</button>
+        </form>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-content container">
+      <!-- Loading Bar -->
+      <div id="loading-bar" class="loading-bar hidden">
+        <p class="pixel-text loading-label">FETCHING PREVIEW & AUTO-TAGGING...</p>
+        <progress class="nes-progress is-pattern" value="100" max="100"></progress>
+      </div>
+
+      <!-- Category Tabs -->
+      <section class="category-tabs-container">
+        <div class="category-tabs">
+          <button type="button" class="tab-btn active" data-category="web">
+            <i class="nes-icon is-small heart"></i>
+            <span class="tab-label">WEB</span>
+            <span class="nes-badge" id="badge-web"><span class="is-primary">0</span></span>
+          </button>
+          <button type="button" class="tab-btn" data-category="api">
+            <i class="nes-icon is-small like"></i>
+            <span class="tab-label">API</span>
+            <span class="nes-badge" id="badge-api"><span class="is-primary">0</span></span>
+          </button>
+          <button type="button" class="tab-btn" data-category="personal">
+            <i class="nes-icon is-small star"></i>
+            <span class="tab-label">PERSONAL</span>
+            <span class="nes-badge" id="badge-personal"><span class="is-primary">0</span></span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Tag Filter Bar -->
+      <section class="tag-filter-section">
+        <div class="tag-filter-wrapper" id="tag-filter-bar">
+          <!-- Dynamically populated tags -->
+        </div>
+      </section>
+
+      <!-- Controls Row: Search & Favorites -->
+      <section class="controls-section">
+        <div class="search-box">
+          <input type="text" id="search-input" class="nes-input" placeholder="Search links or tags..." />
+          <button type="button" id="clear-search-btn" class="nes-btn is-error clear-btn hidden">✕</button>
+        </div>
+        <div class="action-toggles">
+          <button type="button" id="fav-toggle-btn" class="nes-btn pixel-text fav-filter-btn">
+            <i class="nes-icon is-small heart is-empty"></i> FAVS
+          </button>
+          <button type="button" id="export-btn" class="nes-btn pixel-text" title="Export JSON Backup">
+            💾 EXPORT
+          </button>
+          <button type="button" id="import-btn" class="nes-btn pixel-text" title="Import JSON Backup">
+            📂 IMPORT
+          </button>
+          <input type="file" id="import-file-input" accept=".json" style="display: none;" />
+        </div>
+      </section>
+
+      <!-- Link Cards Grid -->
+      <section class="cards-grid" id="cards-grid">
+        <!-- Dynamically rendered link cards -->
+      </section>
+
+      <!-- Empty State -->
+      <div id="empty-state" class="empty-state hidden">
+        <i class="nes-octocat animate"></i>
+        <p class="pixel-text empty-title">NO LINKS FOUND IN THIS VAULT!</p>
+        <p class="pixel-text empty-subtitle">PASTE A LINK ABOVE TO ADD ONE.</p>
+      </div>
+    </main>
+
+    <!-- Edit Modal Dialog -->
+    <dialog class="nes-dialog is-rounded dark-modal" id="edit-modal">
+      <form method="dialog" id="edit-form">
+        <p class="title pixel-text modal-header">EDIT LINK VAULT</p>
+        
+        <div class="nes-field">
+          <label for="edit-title" class="pixel-text">TITLE</label>
+          <input type="text" id="edit-title" class="nes-input" required />
+        </div>
+
+        <div class="nes-field">
+          <label for="edit-category" class="pixel-text">CATEGORY</label>
+          <div class="category-radio-group">
+            <label><input type="radio" class="nes-radio" name="category" value="web" /> <span>WEB</span></label>
+            <label><input type="radio" class="nes-radio" name="category" value="api" /> <span>API</span></label>
+            <label><input type="radio" class="nes-radio" name="category" value="personal" /> <span>PERSONAL</span></label>
+          </div>
+        </div>
+
+        <div class="nes-field">
+          <label class="pixel-text">TAGS</label>
+          <div id="modal-tags-container" class="modal-tags-grid">
+            <!-- Dynamic checkboxes -->
+          </div>
+        </div>
+
+        <div class="nes-field">
+          <label for="edit-image" class="pixel-text">THUMBNAIL IMAGE URL</label>
+          <input type="url" id="edit-image" class="nes-input" placeholder="https://example.com/image.jpg (Optional)" />
+        </div>
+
+        <div class="nes-field">
+          <label for="edit-notes" class="pixel-text">NOTES</label>
+          <textarea id="edit-notes" class="nes-textarea" rows="3" placeholder="Add custom writeup or notes..."></textarea>
+        </div>
+
+        <menu class="dialog-menu modal-actions">
+          <button type="button" class="nes-btn is-error pixel-text" id="cancel-edit-btn">CANCEL</button>
+          <button type="submit" class="nes-btn is-primary pixel-text" id="save-edit-btn">SAVE</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <!-- Duplicate Link Announcement & Category Change Modal -->
+    <dialog class="nes-dialog is-dark" id="duplicate-modal">
+      <form method="dialog">
+        <p class="title pixel-text" style="color: var(--color-yellow); font-size: 11px; margin-bottom: 8px;">⚠️ LINK ALREADY EXISTS</p>
+        
+        <div class="duplicate-info-box" style="background: var(--bg-primary); padding: 12px; border: 2px solid var(--border-color); margin: 12px 0; font-size: 12px; border-radius: 0;">
+          <p style="margin-bottom: 8px; font-weight: 600; color: var(--text-primary); line-height: 1.3;" id="dup-modal-title"></p>
+          <p style="margin-bottom: 6px; color: var(--color-cyan); font-size: 11px;" id="dup-modal-location"></p>
+          <p style="margin-bottom: 0; color: var(--color-orange); font-size: 11px;" id="dup-modal-tags"></p>
+        </div>
+
+        <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 16px;">This URL is already in your vault. Would you like to change its category or tags?</p>
+
+        <menu class="dialog-menu" style="display: flex; gap: 8px; justify-content: flex-end; padding: 0; margin-top: 16px;">
+          <button type="button" class="nes-btn pixel-text" id="cancel-dup-btn" style="font-size: 9px; padding: 6px 10px;">CANCEL</button>
+          <button type="button" class="nes-btn is-warning pixel-text" id="change-cat-dup-btn" style="font-size: 9px; padding: 6px 10px;">CHANGE CATEGORY ✏️</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <!-- Delete Confirmation Modal (Pixel Style) -->
+    <dialog class="nes-dialog is-dark" id="delete-modal">
+      <form method="dialog">
+        <p class="title pixel-text" style="color: var(--color-red); font-size: 11px; margin-bottom: 8px;">💀 DELETE VAULT LINK</p>
+        
+        <p style="font-size: 12px; color: var(--text-primary); margin: 14px 0; line-height: 1.4;" id="delete-modal-text">Are you sure you want to delete this link from your vault?</p>
+
+        <menu class="dialog-menu" style="display: flex; gap: 8px; justify-content: flex-end; padding: 0; margin-top: 16px;">
+          <button type="button" class="nes-btn pixel-text" id="cancel-del-btn" style="font-size: 9px; padding: 6px 10px;">CANCEL</button>
+          <button type="button" class="nes-btn is-error pixel-text" id="confirm-del-btn" style="font-size: 9px; padding: 6px 10px;">DELETE 🗑️</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="toast-container"></div>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
