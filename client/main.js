@@ -230,6 +230,7 @@ function initEventListeners() {
 }
 
 const LOCAL_STORAGE_KEY = 'link_vault_persistent_links_v1';
+const LOCAL_STORAGE_DELETED_KEY = 'link_vault_deleted_links_v1';
 
 function getLocalLinks() {
   try {
@@ -248,12 +249,29 @@ function saveLocalLinks(links) {
   }
 }
 
-async function syncToServer(links) {
+function getDeletedLinkIds() {
+  try {
+    const data = localStorage.getItem(LOCAL_STORAGE_DELETED_KEY);
+    return data ? new Set(JSON.parse(data)) : new Set();
+  } catch (e) {
+    return new Set();
+  }
+}
+
+function saveDeletedLinkIds(deletedSet) {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_DELETED_KEY, JSON.stringify(Array.from(deletedSet)));
+  } catch (e) {
+    console.error('LocalStorage write error for deleted IDs:', e);
+  }
+}
+
+async function syncToServer(links, deletedIds = []) {
   try {
     await fetch(`${API_BASE}/links/sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ links })
+      body: JSON.stringify({ links, deletedIds })
     });
   } catch (e) {
     // Silent fail if backend unreachable offline
@@ -261,6 +279,9 @@ async function syncToServer(links) {
 }
 
 async function loadData() {
+  const deletedSet = getDeletedLinkIds();
+  const deletedArray = Array.from(deletedSet);
+
   let serverLinks = [];
   let serverOk = false;
   try {
@@ -273,19 +294,28 @@ async function loadData() {
     console.warn('Backend reachability issue, falling back to local cache.');
   }
 
-  const localLinks = getLocalLinks();
+  // Filter server links against locally recorded tombstones
+  serverLinks = serverLinks.filter(l => l.id && !deletedSet.has(l.id));
 
-  if (localLinks && Array.isArray(localLinks) && localLinks.length > 0) {
+  const rawLocalLinks = getLocalLinks();
+
+  if (rawLocalLinks && Array.isArray(rawLocalLinks)) {
+    // Filter local cache against deleted tombstones
+    const localLinks = rawLocalLinks.filter(l => l.id && !deletedSet.has(l.id));
     const mergedMap = new Map();
 
     // 1. Load server links into map
     serverLinks.forEach(l => {
-      if (l.id) mergedMap.set(l.id, l);
+      if (l.id && !deletedSet.has(l.id)) {
+        mergedMap.set(l.id, l);
+      }
     });
 
-    // 2. Merge local links (preserve notes, titles, favorites, extra user links)
+    // 2. Merge local links (preserve notes - including empty strings if cleared, titles, favorites, extra user links)
     localLinks.forEach(localItem => {
-      const existingKey = localItem.id && mergedMap.has(localItem.id)
+      if (!localItem.id || deletedSet.has(localItem.id)) return;
+
+      const existingKey = mergedMap.has(localItem.id)
         ? localItem.id
         : Array.from(mergedMap.keys()).find(k => normalizeUrl(mergedMap.get(k).url) === normalizeUrl(localItem.url));
 
@@ -294,7 +324,7 @@ async function loadData() {
         mergedMap.set(existingKey, {
           ...existing,
           ...localItem,
-          notes: (localItem.notes !== undefined && localItem.notes !== '') ? localItem.notes : (existing.notes || ''),
+          notes: localItem.notes !== undefined ? localItem.notes : (existing.notes || ''),
           favorite: localItem.favorite !== undefined ? localItem.favorite : existing.favorite,
           tags: (localItem.tags && localItem.tags.length > 0) ? localItem.tags : (existing.tags || []),
           category: localItem.category || existing.category
@@ -309,12 +339,13 @@ async function loadData() {
     saveLocalLinks(mergedList);
 
     if (serverOk) {
-      syncToServer(mergedList);
+      syncToServer(mergedList, deletedArray);
     }
   } else {
     state.allLinks = serverLinks;
-    if (serverLinks.length > 0) {
-      saveLocalLinks(serverLinks);
+    saveLocalLinks(serverLinks);
+    if (serverOk && deletedArray.length > 0) {
+      syncToServer(serverLinks, deletedArray);
     }
   }
 
@@ -438,22 +469,29 @@ async function performDeleteLink(id) {
     cardElem.classList.add('dismissing');
   }
 
+  // Record tombstone locally immediately so deletion persists across reloads/restarts
+  const deletedSet = getDeletedLinkIds();
+  deletedSet.add(id);
+  saveDeletedLinkIds(deletedSet);
+
+  state.allLinks = state.allLinks.filter(l => l.id !== id);
+  saveLocalLinks(state.allLinks);
+  updateTabCounts();
+  renderTagBar();
+
   try {
     const res = await fetch(`${API_BASE}/links/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Delete failed');
-
-    state.allLinks = state.allLinks.filter(l => l.id !== id);
-    saveLocalLinks(state.allLinks);
-    updateTabCounts();
-    renderTagBar();
-
-    setTimeout(() => {
-      renderCards();
-      showToast('Link deleted 💀', 'info');
-    }, 200);
   } catch (err) {
-    showToast('Failed to delete link', 'error');
+    console.warn('Server delete request error, tombstone queued for sync.');
   }
+
+  syncToServer(state.allLinks, Array.from(deletedSet));
+
+  setTimeout(() => {
+    renderCards();
+    showToast('Link deleted 💀', 'info');
+  }, 200);
 }
 
 // Edit Modal DOM binding
@@ -499,6 +537,25 @@ async function handleSaveEdit() {
   const updatedNotes = editNotesInput.value.trim();
   const updatedImage = editImageInput.value.trim();
 
+  // Optimistic update local state & local storage immediately
+  const index = state.allLinks.findIndex(l => l.id === id);
+  if (index !== -1) {
+    state.allLinks[index] = {
+      ...state.allLinks[index],
+      title: updatedTitle,
+      category: selectedCategory,
+      tags: selectedTags,
+      notes: updatedNotes,
+      image: updatedImage
+    };
+    saveLocalLinks(state.allLinks);
+  }
+
+  editModal.close();
+  updateTabCounts();
+  renderTagBar();
+  renderCards();
+
   try {
     const res = await fetch(`${API_BASE}/links/${id}`, {
       method: 'PUT',
@@ -515,19 +572,13 @@ async function handleSaveEdit() {
     if (!res.ok) throw new Error('Update failed');
 
     const updatedLink = await res.json();
-    const index = state.allLinks.findIndex(l => l.id === id);
     if (index !== -1) {
       state.allLinks[index] = updatedLink;
       saveLocalLinks(state.allLinks);
     }
-
-    editModal.close();
-    updateTabCounts();
-    renderTagBar();
-    renderCards();
     showToast('Vault link updated ✨', 'success');
   } catch (err) {
-    showToast('Failed to update link', 'error');
+    showToast('Updated locally ✨', 'info');
   }
 }
 
@@ -754,6 +805,16 @@ async function handleImportFile(e) {
     if (!res.ok) throw new Error('Import failed');
 
     const result = await res.json();
+
+    // If imported links contain IDs previously deleted, remove them from deletedSet
+    const deletedSet = getDeletedLinkIds();
+    result.links.forEach(l => {
+      if (l.id && deletedSet.has(l.id)) {
+        deletedSet.delete(l.id);
+      }
+    });
+    saveDeletedLinkIds(deletedSet);
+
     state.allLinks = result.links;
     saveLocalLinks(state.allLinks);
     updateTabCounts();

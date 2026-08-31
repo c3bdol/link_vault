@@ -405,6 +405,7 @@ app.post('/api/links/sync', async (req, res) => {
   try {
     const rawData = req.body;
     const incomingLinks = Array.isArray(rawData) ? rawData : (rawData && Array.isArray(rawData.links) ? rawData.links : null);
+    const deletedIds = rawData && Array.isArray(rawData.deletedIds) ? rawData.deletedIds : [];
 
     if (!incomingLinks) {
       return res.status(400).json({ error: 'Invalid JSON payload. Expected array of links.' });
@@ -412,8 +413,17 @@ app.post('/api/links/sync', async (req, res) => {
 
     const db = await readDb();
 
+    // 1. Remove any links present in deletedIds tombstones
+    if (deletedIds.length > 0) {
+      const deletedSet = new Set(deletedIds);
+      db.links = db.links.filter(l => !deletedSet.has(l.id));
+    }
+
+    // 2. Upsert remaining incoming links
     for (const link of incomingLinks) {
       if (!link || (!link.id && !link.url)) continue;
+      if (deletedIds.includes(link.id)) continue;
+
       const targetNorm = link.url ? normalizeUrl(link.url) : '';
       const existingIndex = db.links.findIndex(l => (l.id && link.id && l.id === link.id) || (targetNorm && normalizeUrl(l.url) === targetNorm));
 
@@ -438,7 +448,7 @@ app.post('/api/links/sync', async (req, res) => {
           favicon: link.favicon || '',
           category: link.category || 'personal',
           tags: Array.isArray(link.tags) ? link.tags : [],
-          notes: link.notes || '',
+          notes: link.notes !== undefined ? link.notes : '',
           favorite: Boolean(link.favorite),
           createdAt: link.createdAt || new Date().toISOString()
         });
