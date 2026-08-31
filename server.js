@@ -400,6 +400,58 @@ app.delete('/api/links/:id', async (req, res) => {
   res.json({ message: 'Link deleted successfully' });
 });
 
+// POST /api/links/sync - Bulk sync/upsert links from client persistent cache
+app.post('/api/links/sync', async (req, res) => {
+  try {
+    const rawData = req.body;
+    const incomingLinks = Array.isArray(rawData) ? rawData : (rawData && Array.isArray(rawData.links) ? rawData.links : null);
+
+    if (!incomingLinks) {
+      return res.status(400).json({ error: 'Invalid JSON payload. Expected array of links.' });
+    }
+
+    const db = await readDb();
+
+    for (const link of incomingLinks) {
+      if (!link || (!link.id && !link.url)) continue;
+      const targetNorm = link.url ? normalizeUrl(link.url) : '';
+      const existingIndex = db.links.findIndex(l => (l.id && link.id && l.id === link.id) || (targetNorm && normalizeUrl(l.url) === targetNorm));
+
+      if (existingIndex !== -1) {
+        // Update existing link fields if provided
+        if (link.notes !== undefined) db.links[existingIndex].notes = link.notes;
+        if (link.favorite !== undefined) db.links[existingIndex].favorite = link.favorite;
+        if (link.title !== undefined) db.links[existingIndex].title = link.title;
+        if (link.description !== undefined) db.links[existingIndex].description = link.description;
+        if (link.category !== undefined) db.links[existingIndex].category = link.category;
+        if (link.tags !== undefined) db.links[existingIndex].tags = link.tags;
+        if (link.image !== undefined) db.links[existingIndex].image = link.image;
+        if (link.favicon !== undefined) db.links[existingIndex].favicon = link.favicon;
+      } else {
+        // Unshift new link
+        db.links.unshift({
+          id: link.id || crypto.randomUUID(),
+          url: link.url,
+          title: link.title || link.url,
+          description: link.description || '',
+          image: link.image || '',
+          favicon: link.favicon || '',
+          category: link.category || 'personal',
+          tags: Array.isArray(link.tags) ? link.tags : [],
+          notes: link.notes || '',
+          favorite: Boolean(link.favorite),
+          createdAt: link.createdAt || new Date().toISOString()
+        });
+      }
+    }
+
+    await writeDb(db);
+    res.json({ message: 'Sync successful', links: db.links });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to sync link data' });
+  }
+});
+
 // POST /api/links/import - Batch import links from exported JSON
 app.post('/api/links/import', async (req, res) => {
   try {
@@ -416,8 +468,8 @@ app.post('/api/links/import', async (req, res) => {
     for (const link of importedLinks) {
       if (!link || !link.url) continue;
       const norm = normalizeUrl(link.url);
-      const exists = db.links.some(l => normalizeUrl(l.url) === norm);
-      if (!exists) {
+      const existsIndex = db.links.findIndex(l => (l.id && link.id && l.id === link.id) || normalizeUrl(l.url) === norm);
+      if (existsIndex === -1) {
         db.links.unshift({
           id: link.id || crypto.randomUUID(),
           url: link.url,
@@ -432,6 +484,13 @@ app.post('/api/links/import', async (req, res) => {
           createdAt: link.createdAt || new Date().toISOString()
         });
         addedCount++;
+      } else {
+        if (link.notes !== undefined && link.notes !== '') {
+          db.links[existsIndex].notes = link.notes;
+        }
+        if (link.favorite !== undefined) {
+          db.links[existsIndex].favorite = link.favorite;
+        }
       }
     }
 

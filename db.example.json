@@ -1,6 +1,98 @@
 {
   "links": [
     {
+      "id": "32e36195-c7b0-47fd-b455-365a1433bc9a",
+      "url": "https://medium.com/@HX007/a-journey-of-limited-path-traversal-to-rce-with-40-000-bounty-fc63c89576ea",
+      "title": "A Journey of Limited Path Traversal To RCE With $40,000 Bounty!",
+      "description": "#Introduce Myself:",
+      "image": "https://miro.medium.com/v2/resize:fit:1200/1*ghObfjAwCYs-BkL7Tf4vrA.png",
+      "favicon": "https://miro.medium.com/v2/5d8de952517e8160e40ef9841c781cdc14a5db313057fa3c3de41c6f5b494b19",
+      "category": "web",
+      "tags": [
+        "Broken Access Control",
+        "Crypto Failures",
+        "Injection (XSS/SQLi)"
+      ],
+      "notes": "",
+      "favorite": false,
+      "createdAt": "2026-08-30T11:05:02.548Z"
+    },
+    {
+      "id": "0843c8fd-5f6a-460a-adeb-91092261ed02",
+      "url": "https://hacktricks.wiki/en/network-services-pentesting/pentesting-web/web-api-pentesting.html",
+      "title": "Web API Pentesting - HackTricks",
+      "description": "Pentesting APIs involves a structured approach to uncovering vulnerabilities. This guide encapsulates a comprehensive methodology, emphasizing practical...",
+      "image": "https://hacktricks.wiki/en/images/HACKTRICKS-logo.svg",
+      "favicon": "https://hacktricks.wiki/en/favicon.svg",
+      "category": "api",
+      "tags": [
+        "Broken Object Auth (BOLA)"
+      ],
+      "notes": "",
+      "favorite": false,
+      "createdAt": "2026-08-30T10:49:18.123Z"
+    },
+    {
+      "id": "0bd7dda0-17e0-41bd-b781-ba04a6692a37",
+      "url": "https://www.youtube.com/",
+      "title": "YouTube",
+      "description": "Enjoy the videos and music you love, upload original content, and share it all with friends, family, and the world on YouTube.",
+      "image": "https://www.youtube.com/img/desktop/yt_1200.png",
+      "favicon": "https://www.youtube.com/s/desktop/f13793d9/img/favicon_32x32.png",
+      "category": "personal",
+      "tags": [
+        "Bookmark"
+      ],
+      "notes": "",
+      "favorite": false,
+      "createdAt": "2026-08-30T10:48:24.686Z"
+    },
+    {
+      "id": "ca779527-aee0-4dda-9a35-f1fd7c9e67e6",
+      "url": "https://httpbin.org/get",
+      "title": "https://httpbin.org/get",
+      "description": "No description available.",
+      "image": "",
+      "favicon": "https://httpbin.org/favicon.ico",
+      "category": "personal",
+      "tags": [
+        "Bookmark"
+      ],
+      "notes": "",
+      "favorite": false,
+      "createdAt": "2026-08-30T10:37:38.974Z"
+    },
+    {
+      "id": "1b62b68c-e973-47bc-8ce2-5cacf2b0e7e6",
+      "url": "https://swagger.io/docs/specification/authentication/",
+      "title": "Authentication",
+      "description": "No description available.",
+      "image": "",
+      "favicon": "https://swagger.io/docs/favicon.svg",
+      "category": "api",
+      "tags": [
+        "Broken Auth"
+      ],
+      "notes": "",
+      "favorite": false,
+      "createdAt": "2026-08-30T10:11:39.436Z"
+    },
+    {
+      "id": "f152f45b-2bcd-4153-9b44-c283ef41c448",
+      "url": "https://portswigger.net/web-security/cross-site-scripting",
+      "title": "What is cross-site scripting (XSS) and how to prevent it? | Web Security Academy",
+      "description": "In this section, we'll explain what cross-site scripting is, describe the different varieties of cross-site scripting vulnerabilities, and spell out how to ...",
+      "image": "https://portswigger.net/content/images/logos/academy-twittercard.png",
+      "favicon": "https://portswigger.net/content/images/logos/favicon.ico",
+      "category": "web",
+      "tags": [
+        "Injection (XSS/SQLi)"
+      ],
+      "notes": "XSS labs practice links",
+      "favorite": true,
+      "createdAt": "2026-08-30T10:11:36.325Z"
+    },
+    {
       "id": "init-web-1",
       "url": "https://owasp.org/Top10/",
       "title": "OWASP Top 10 Web Application Security Risks",

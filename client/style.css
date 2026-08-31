@@ -4,26 +4,40 @@
 
 :root {
   /* Tokyo Night Storm Palette */
-  --bg-primary: #1a1b26;      /* Deepest background */
-  --bg-secondary: #24283b;    /* Containers, cards */
-  --bg-elevated: #414868;     /* Hover, active states */
+  --bg-primary: #1a1b26;
+  /* Deepest background */
+  --bg-secondary: #24283b;
+  /* Containers, cards */
+  --bg-elevated: #414868;
+  /* Hover, active states */
 
   /* Text */
-  --text-primary: #c0caf5;    /* Main text */
-  --text-secondary: #a9b1d6;  /* Subtitles, descriptions */
-  --text-muted: #565f89;      /* Placeholders, metadata */
+  --text-primary: #c0caf5;
+  /* Main text */
+  --text-secondary: #a9b1d6;
+  /* Subtitles, descriptions */
+  --text-muted: #565f89;
+  /* Placeholders, metadata */
 
   /* Category Accents */
-  --accent-web: #7aa2f7;      /* Blue — Web Tab */
-  --accent-api: #bb9af7;      /* Magenta — API Tab */
-  --accent-personal: #9ece6a; /* Green — Personal Tab */
+  --accent-web: #7aa2f7;
+  /* Blue — Web Tab */
+  --accent-api: #bb9af7;
+  /* Magenta — API Tab */
+  --accent-personal: #9ece6a;
+  /* Green — Personal Tab */
 
   /* Semantic Highlights */
-  --color-red: #f7768e;       /* Delete, error */
-  --color-orange: #ff9e64;    /* Warning, tag highlight */
-  --color-yellow: #e0af68;    /* Stars, favorites */
-  --color-cyan: #7dcfff;      /* Links, interactive */
-  --color-mint: #73daca;      /* Success, confirm */
+  --color-red: #f7768e;
+  /* Delete, error */
+  --color-orange: #ff9e64;
+  /* Warning, tag highlight */
+  --color-yellow: #e0af68;
+  /* Stars, favorites */
+  --color-cyan: #7dcfff;
+  /* Links, interactive */
+  --color-mint: #73daca;
+  /* Success, confirm */
 
   /* Borders */
   --border-color: #414868;
@@ -46,7 +60,9 @@ body {
 }
 
 /* Language Auto-detect for Arabic */
-[lang="ar"], [dir="rtl"], :lang(ar) {
+[lang="ar"],
+[dir="rtl"],
+:lang(ar) {
   font-family: 'IBM Plex Sans Arabic', 'Montserrat', sans-serif;
 }
 
@@ -65,7 +81,8 @@ body {
    NES.css Theme Overrides
    ========================================================================== */
 
-.nes-container, .nes-dialog {
+.nes-container,
+.nes-dialog {
   background-color: var(--bg-secondary) !important;
   color: var(--text-primary) !important;
   border-color: var(--border-color) !important;
@@ -75,7 +92,8 @@ body {
   border-image-repeat: stretch !important;
 }
 
-.nes-input, .nes-textarea {
+.nes-input,
+.nes-textarea {
   background-color: var(--bg-primary) !important;
   color: var(--text-primary) !important;
   border-color: var(--border-color) !important;
@@ -83,7 +101,8 @@ body {
   font-size: 14px;
 }
 
-.nes-input::placeholder, .nes-textarea::placeholder {
+.nes-input::placeholder,
+.nes-textarea::placeholder {
   color: var(--text-muted) !important;
   font-family: 'Press Start 2P', cursive;
   font-size: 9px;
@@ -251,7 +270,7 @@ body {
   margin: 0 !important;
 }
 
-.tab-btn .nes-badge > span {
+.tab-btn .nes-badge>span {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -269,19 +288,19 @@ body {
   white-space: nowrap !important;
 }
 
-.tab-btn.active[data-category="web"] .nes-badge > span {
+.tab-btn.active[data-category="web"] .nes-badge>span {
   background-color: var(--accent-web) !important;
   color: #1a1b26 !important;
   border-color: var(--accent-web) !important;
 }
 
-.tab-btn.active[data-category="api"] .nes-badge > span {
+.tab-btn.active[data-category="api"] .nes-badge>span {
   background-color: var(--accent-api) !important;
   color: #1a1b26 !important;
   border-color: var(--accent-api) !important;
 }
 
-.tab-btn.active[data-category="personal"] .nes-badge > span {
+.tab-btn.active[data-category="personal"] .nes-badge>span {
   background-color: var(--accent-personal) !important;
   color: #1a1b26 !important;
   border-color: var(--accent-personal) !important;
@@ -307,6 +326,7 @@ body {
 .tag-filter-wrapper::-webkit-scrollbar {
   height: 6px;
 }
+
 .tag-filter-wrapper::-webkit-scrollbar-thumb {
   background-color: var(--bg-elevated);
 }
@@ -447,9 +467,17 @@ body {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
-.link-card[data-category="web"] { border-left: 5px solid var(--accent-web); }
-.link-card[data-category="api"] { border-left: 5px solid var(--accent-api); }
-.link-card[data-category="personal"] { border-left: 5px solid var(--accent-personal); }
+.link-card[data-category="web"] {
+  border-left: 5px solid var(--accent-web);
+}
+
+.link-card[data-category="api"] {
+  border-left: 5px solid var(--accent-api);
+}
+
+.link-card[data-category="personal"] {
+  border-left: 5px solid var(--accent-personal);
+}
 
 .card-image-wrapper {
   height: 140px;
@@ -718,42 +746,91 @@ dialog::backdrop,
   font-size: 9px;
   padding: 12px 16px;
   border: 3px solid var(--border-color);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
   animation: slideInRight 0.3s ease forwards;
 }
 
-.toast.is-success { border-color: var(--color-mint); color: var(--color-mint); }
-.toast.is-error { border-color: var(--color-red); color: var(--color-red); }
-.toast.is-info { border-color: var(--color-cyan); color: var(--color-cyan); }
-.toast.dismissing { animation: slideOutRight 0.3s ease forwards; }
+.toast.is-success {
+  border-color: var(--color-mint);
+  color: var(--color-mint);
+}
+
+.toast.is-error {
+  border-color: var(--color-red);
+  color: var(--color-red);
+}
+
+.toast.is-info {
+  border-color: var(--color-cyan);
+  color: var(--color-cyan);
+}
+
+.toast.dismissing {
+  animation: slideOutRight 0.3s ease forwards;
+}
 
 /* ==========================================================================
    Animations
    ========================================================================== */
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fadeOutRight {
-  from { opacity: 1; transform: translateX(0); }
-  to { opacity: 0; transform: translateX(30px); }
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(30px);
+  }
 }
 
 @keyframes heartBeat {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.3); }
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.3);
+  }
 }
 
 @keyframes slideInRight {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 @keyframes slideOutRight {
-  from { transform: translateX(0); opacity: 1; }
-  to { transform: translateX(100%); opacity: 0; }
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
 }
 
 /* ==========================================================================
@@ -771,7 +848,7 @@ dialog::backdrop,
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .brand {
     justify-content: center;
   }
@@ -811,7 +888,7 @@ dialog::backdrop,
     max-width: 100%;
   }
 
-  .tab-btn .nes-badge > span {
+  .tab-btn .nes-badge>span {
     font-size: 7px !important;
     height: 16px !important;
     padding: 1px 5px !important;

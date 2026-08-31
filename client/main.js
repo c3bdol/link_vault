@@ -229,19 +229,98 @@ function initEventListeners() {
   window.addEventListener('focus', checkClipboardForUrl);
 }
 
-// ===== API CALLS =====
+const LOCAL_STORAGE_KEY = 'link_vault_persistent_links_v1';
+
+function getLocalLinks() {
+  try {
+    const data = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return data ? JSON.parse(data) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveLocalLinks(links) {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(links));
+  } catch (e) {
+    console.error('LocalStorage write error:', e);
+  }
+}
+
+async function syncToServer(links) {
+  try {
+    await fetch(`${API_BASE}/links/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ links })
+    });
+  } catch (e) {
+    // Silent fail if backend unreachable offline
+  }
+}
 
 async function loadData() {
+  let serverLinks = [];
+  let serverOk = false;
   try {
     const res = await fetch(`${API_BASE}/links`);
-    if (!res.ok) throw new Error('Failed to load links');
-    state.allLinks = await res.json();
-    updateTabCounts();
-    renderTagBar();
-    renderCards();
+    if (res.ok) {
+      serverLinks = await res.json();
+      serverOk = true;
+    }
   } catch (err) {
-    showToast('Failed to connect to backend server!', 'error');
+    console.warn('Backend reachability issue, falling back to local cache.');
   }
+
+  const localLinks = getLocalLinks();
+
+  if (localLinks && Array.isArray(localLinks) && localLinks.length > 0) {
+    const mergedMap = new Map();
+
+    // 1. Load server links into map
+    serverLinks.forEach(l => {
+      if (l.id) mergedMap.set(l.id, l);
+    });
+
+    // 2. Merge local links (preserve notes, titles, favorites, extra user links)
+    localLinks.forEach(localItem => {
+      const existingKey = localItem.id && mergedMap.has(localItem.id)
+        ? localItem.id
+        : Array.from(mergedMap.keys()).find(k => normalizeUrl(mergedMap.get(k).url) === normalizeUrl(localItem.url));
+
+      if (existingKey) {
+        const existing = mergedMap.get(existingKey);
+        mergedMap.set(existingKey, {
+          ...existing,
+          ...localItem,
+          notes: (localItem.notes !== undefined && localItem.notes !== '') ? localItem.notes : (existing.notes || ''),
+          favorite: localItem.favorite !== undefined ? localItem.favorite : existing.favorite,
+          tags: (localItem.tags && localItem.tags.length > 0) ? localItem.tags : (existing.tags || []),
+          category: localItem.category || existing.category
+        });
+      } else {
+        mergedMap.set(localItem.id || crypto.randomUUID(), localItem);
+      }
+    });
+
+    const mergedList = Array.from(mergedMap.values());
+    state.allLinks = mergedList;
+    saveLocalLinks(mergedList);
+
+    if (serverOk) {
+      syncToServer(mergedList);
+    }
+  } else {
+    state.allLinks = serverLinks;
+    if (serverLinks.length > 0) {
+      saveLocalLinks(serverLinks);
+    }
+  }
+
+  updateTabCounts();
+  renderTagBar();
+  renderCards();
 }
 
 function normalizeUrl(urlStr) {
@@ -299,6 +378,7 @@ async function handleAddLink(url) {
 
     const newLink = await res.json();
     state.allLinks.unshift(newLink);
+    saveLocalLinks(state.allLinks);
 
     // Auto-switch to the detected category
     state.activeCategory = newLink.category;
@@ -326,6 +406,7 @@ async function toggleFavorite(id) {
 
   const newFavStatus = !link.favorite;
   link.favorite = newFavStatus; // Optimistic update
+  saveLocalLinks(state.allLinks);
 
   renderCards();
 
@@ -362,9 +443,10 @@ async function performDeleteLink(id) {
     if (!res.ok) throw new Error('Delete failed');
 
     state.allLinks = state.allLinks.filter(l => l.id !== id);
+    saveLocalLinks(state.allLinks);
     updateTabCounts();
     renderTagBar();
-    
+
     setTimeout(() => {
       renderCards();
       showToast('Link deleted 💀', 'info');
@@ -436,6 +518,7 @@ async function handleSaveEdit() {
     const index = state.allLinks.findIndex(l => l.id === id);
     if (index !== -1) {
       state.allLinks[index] = updatedLink;
+      saveLocalLinks(state.allLinks);
     }
 
     editModal.close();
@@ -472,7 +555,7 @@ function updateTabCounts() {
 
 function renderTagBar() {
   const categoryLinks = state.allLinks.filter(l => l.category === state.activeCategory);
-  
+
   // Calculate counts for each tag in this category
   const tagCounts = {};
   categoryLinks.forEach(l => {
@@ -482,7 +565,7 @@ function renderTagBar() {
   });
 
   const availableTags = TAG_MAP[state.activeCategory] || [];
-  
+
   let html = `
     <button class="tag-pill ${state.activeTag === 'All' ? 'active' : ''}" data-tag="All">
       ALL (${categoryLinks.length})
@@ -527,7 +610,7 @@ function renderCards() {
   // Filter by search query
   if (state.searchQuery) {
     const q = state.searchQuery.toLowerCase();
-    filtered = filtered.filter(l => 
+    filtered = filtered.filter(l =>
       (l.title && l.title.toLowerCase().includes(q)) ||
       (l.description && l.description.toLowerCase().includes(q)) ||
       (l.url && l.url.toLowerCase().includes(q)) ||
@@ -562,7 +645,7 @@ function createCardHtml(link) {
   const dirAttr = isArabic ? 'dir="rtl" lang="ar"' : '';
 
   let domain = link.url;
-  try { domain = new URL(link.url).hostname.replace('www.', ''); } catch (e) {}
+  try { domain = new URL(link.url).hostname.replace('www.', ''); } catch (e) { }
 
   let iconClass = 'heart';
   if (link.category === 'api') iconClass = 'like';
@@ -647,7 +730,7 @@ function exportData() {
   const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.allLinks, null, 2));
   const downloadAnchor = document.createElement('a');
   downloadAnchor.setAttribute("href", dataStr);
-  downloadAnchor.setAttribute("download", `link_vault_export_${new Date().toISOString().slice(0,10)}.json`);
+  downloadAnchor.setAttribute("download", `link_vault_export_${new Date().toISOString().slice(0, 10)}.json`);
   document.body.appendChild(downloadAnchor);
   downloadAnchor.click();
   downloadAnchor.remove();
@@ -672,6 +755,7 @@ async function handleImportFile(e) {
 
     const result = await res.json();
     state.allLinks = result.links;
+    saveLocalLinks(state.allLinks);
     updateTabCounts();
     renderTagBar();
     renderCards();
@@ -700,7 +784,7 @@ async function checkClipboardForUrl() {
 
 function escapeHtml(str) {
   if (!str) return '';
-  return str.replace(/[&<>"']/g, function(m) {
+  return str.replace(/[&<>"']/g, function (m) {
     return {
       '&': '&amp;',
       '<': '&lt;',
