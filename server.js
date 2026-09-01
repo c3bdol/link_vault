@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import crypto from 'crypto';
-import { db } from './firebase.js';
+import { db, isInitialized, initError, checkEnvVars } from './firebase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -258,14 +258,29 @@ function normalizeUrl(urlStr) {
 }
 
 function ensureDb(res) {
-  if (!db) {
-    res.status(500).json({ error: 'Firestore database instance is not available. Please verify Firebase environment variables in Vercel settings.' });
+  if (!db || !isInitialized) {
+    const envStatus = checkEnvVars();
+    const reason = initError || 'Firestore is not initialized. Check Vercel environment variables.';
+    res.status(500).json({
+      error: 'Firestore connection error',
+      details: reason,
+      envStatus
+    });
     return false;
   }
   return true;
 }
 
 // Routes
+
+// GET /api/env-check (Diagnostic endpoint)
+app.get('/api/env-check', (req, res) => {
+  res.json({
+    initialized: isInitialized,
+    error: initError || null,
+    envStatus: checkEnvVars()
+  });
+});
 
 // GET /api/links
 app.get('/api/links', async (req, res) => {

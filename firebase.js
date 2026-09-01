@@ -4,8 +4,6 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const { FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, FIRESTORE_EMULATOR_HOST } = process.env;
-
 function parsePrivateKey(key) {
   if (!key) return '';
   let str = key.trim();
@@ -18,54 +16,59 @@ function parsePrivateKey(key) {
 }
 
 let isInitialized = false;
+let initError = null;
+
+const projectId = process.env.FIREBASE_PROJECT_ID ? process.env.FIREBASE_PROJECT_ID.trim() : '';
+const clientEmail = process.env.FIREBASE_CLIENT_EMAIL ? process.env.FIREBASE_CLIENT_EMAIL.trim() : '';
+const privateKey = process.env.FIREBASE_PRIVATE_KEY ? parsePrivateKey(process.env.FIREBASE_PRIVATE_KEY) : '';
+const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST;
+
+function checkEnvVars() {
+  return {
+    FIREBASE_PROJECT_ID: Boolean(projectId),
+    FIREBASE_CLIENT_EMAIL: Boolean(clientEmail),
+    FIREBASE_PRIVATE_KEY: Boolean(privateKey),
+  };
+}
 
 if (!admin.getApps().length) {
-  if (FIRESTORE_EMULATOR_HOST) {
-    const projectId = FIREBASE_PROJECT_ID || 'link-vault-demo';
-    admin.initializeApp({ projectId });
+  if (emulatorHost) {
+    admin.initializeApp({ projectId: projectId || 'link-vault-demo' });
     isInitialized = true;
-    console.log(`🔥 Firebase Admin initialized in EMULATOR mode (Host: ${FIRESTORE_EMULATOR_HOST}, Project: ${projectId})`);
-  } else if (FIREBASE_PROJECT_ID && FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
+    console.log(`🔥 Firebase Admin initialized in EMULATOR mode (Host: ${emulatorHost})`);
+  } else if (projectId && clientEmail && privateKey) {
     try {
-      const formattedPrivateKey = parsePrivateKey(FIREBASE_PRIVATE_KEY);
-      const cleanProjectId = FIREBASE_PROJECT_ID.trim();
-      const cleanClientEmail = FIREBASE_CLIENT_EMAIL.trim();
-
       admin.initializeApp({
         credential: admin.credential.cert({
-          projectId: cleanProjectId,
-          clientEmail: cleanClientEmail,
-          privateKey: formattedPrivateKey,
+          projectId,
+          clientEmail,
+          privateKey,
         }),
       });
       isInitialized = true;
-      console.log(`🔥 Firebase Admin initialized in CLOUD mode (Project: ${cleanProjectId})`);
+      console.log(`🔥 Firebase Admin initialized in CLOUD mode (Project: ${projectId})`);
     } catch (err) {
+      initError = err.message;
       console.error('❌ Failed to initialize Firebase Admin with credentials:', err.message);
     }
   } else {
-    console.warn('⚠️ Missing one or more Firebase environment variables on Vercel.');
-  }
-
-  // Fallback: Ensure an admin app exists so server start never crashes top-level
-  if (!isInitialized && !admin.getApps().length) {
-    try {
-      const projectId = (FIREBASE_PROJECT_ID && FIREBASE_PROJECT_ID.trim()) || 'link-vault-demo';
-      admin.initializeApp({ projectId });
-      console.log(`🔥 Firebase Admin initialized with fallback project (${projectId})`);
-    } catch (err) {
-      console.error('❌ Fallback Firebase initialization error:', err.message);
-    }
+    const missing = [];
+    if (!projectId) missing.push('FIREBASE_PROJECT_ID');
+    if (!clientEmail) missing.push('FIREBASE_CLIENT_EMAIL');
+    if (!privateKey) missing.push('FIREBASE_PRIVATE_KEY');
+    initError = `Missing Vercel environment variables: ${missing.join(', ')}`;
+    console.warn(`⚠️ ${initError}`);
   }
 }
 
 let dbInstance = null;
-try {
-  if (admin.getApps().length > 0) {
+if (isInitialized && admin.getApps().length > 0) {
+  try {
     dbInstance = getFirestore();
+  } catch (e) {
+    initError = e.message;
+    console.error('❌ Error initializing Firestore instance:', e.message);
   }
-} catch (e) {
-  console.error('❌ Error initializing Firestore instance:', e.message);
 }
 
-export { dbInstance as db };
+export { dbInstance as db, isInitialized, initError, checkEnvVars };
