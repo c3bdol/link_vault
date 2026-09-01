@@ -12,3 +12,9 @@ client/dist/
 .env
 *.log
 .DS_Store
+
+# Firebase
+firebase-service-account.json
+
+# Fuse temporary files
+.fuse_hidden*

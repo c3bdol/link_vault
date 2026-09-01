@@ -13,7 +13,9 @@
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
     "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
     "express": "^4.19.2",
+    "firebase-admin": "^14.3.0",
     "node-fetch": "^3.3.2"
   },
   "devDependencies": {

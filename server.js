@@ -1,23 +1,20 @@
 import express from 'express';
 import cors from 'cors';
-import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import crypto from 'crypto';
+import { db } from './firebase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DB_PATH = process.env.VERCEL
-  ? path.join('/tmp', 'db.json')
-  : path.join(__dirname, 'db.json');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Category rules engine
 const CATEGORY_RULES = {
@@ -111,28 +108,6 @@ const PERSONAL_TAG_RULES = [
   { tag: "Reference", keywords: ["cheat sheet", "docs", "documentation", "reference", "api docs", "spec"] },
   { tag: "Inspiration", keywords: ["design", "ui", "ux", "inspiration", "awesome", "showcase"] }
 ];
-
-// Load DB with fallback to db.example.json
-async function readDb() {
-  try {
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    return JSON.parse(data);
-  } catch (err) {
-    try {
-      const examplePath = path.join(__dirname, 'db.example.json');
-      const exampleData = await fs.readFile(examplePath, 'utf-8');
-      await fs.writeFile(DB_PATH, exampleData, 'utf-8');
-      return JSON.parse(exampleData);
-    } catch (e) {
-      return { links: [] };
-    }
-  }
-}
-
-// Save DB
-async function writeDb(data) {
-  await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
-}
 
 // Auto Tag Link
 function autoTagLink(category, url, title, description) {
@@ -272,36 +247,54 @@ async function scrapeMetadata(targetUrl) {
   }
 }
 
+function normalizeUrl(urlStr) {
+  if (!urlStr) return '';
+  try {
+    const u = new URL(urlStr);
+    return (u.origin + u.pathname).replace(/\/$/, '').toLowerCase();
+  } catch (e) {
+    return urlStr.trim().replace(/\/$/, '').toLowerCase();
+  }
+}
+
 // Routes
 
 // GET /api/links
 app.get('/api/links', async (req, res) => {
-  const { category, tag, search, favorite } = req.query;
-  const db = await readDb();
-  let links = db.links || [];
+  try {
+    const { category, tag, search, favorite } = req.query;
+    const snapshot = await db.collection('links').get();
+    
+    let links = [];
+    snapshot.forEach(doc => {
+      links.push({ id: doc.id, ...doc.data() });
+    });
 
-  if (category) {
-    links = links.filter(l => l.category === category);
-  }
-  if (tag && tag !== 'All') {
-    links = links.filter(l => l.tags && l.tags.some(t => t.toLowerCase().includes(tag.toLowerCase())));
-  }
-  if (favorite === 'true') {
-    links = links.filter(l => l.favorite === true);
-  }
-  if (search) {
-    const q = search.toLowerCase();
-    links = links.filter(l => 
-      (l.title && l.title.toLowerCase().includes(q)) ||
-      (l.description && l.description.toLowerCase().includes(q)) ||
-      (l.url && l.url.toLowerCase().includes(q)) ||
-      (l.notes && l.notes.toLowerCase().includes(q))
-    );
-  }
+    if (category) {
+      links = links.filter(l => l.category === category);
+    }
+    if (tag && tag !== 'All') {
+      links = links.filter(l => l.tags && l.tags.some(t => t.toLowerCase().includes(tag.toLowerCase())));
+    }
+    if (favorite === 'true') {
+      links = links.filter(l => l.favorite === true);
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      links = links.filter(l => 
+        (l.title && l.title.toLowerCase().includes(q)) ||
+        (l.description && l.description.toLowerCase().includes(q)) ||
+        (l.url && l.url.toLowerCase().includes(q)) ||
+        (l.notes && l.notes.toLowerCase().includes(q))
+      );
+    }
 
-  // Sort by createdAt descending
-  links.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  res.json(links);
+    links.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    res.json(links);
+  } catch (err) {
+    console.error('Error fetching links from Firestore:', err);
+    res.status(500).json({ error: 'Failed to fetch links' });
+  }
 });
 
 // GET /api/preview
@@ -314,155 +307,114 @@ app.get('/api/preview', async (req, res) => {
   res.json({ ...meta, category, tags });
 });
 
-function normalizeUrl(urlStr) {
-  if (!urlStr) return '';
-  try {
-    const u = new URL(urlStr);
-    return (u.origin + u.pathname).replace(/\/$/, '').toLowerCase();
-  } catch (e) {
-    return urlStr.trim().replace(/\/$/, '').toLowerCase();
-  }
-}
-
 // POST /api/links
 app.post('/api/links', async (req, res) => {
-  const { url } = req.body;
-  if (!url) return res.status(400).json({ error: 'URL is required' });
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: 'URL is required' });
 
-  const db = await readDb();
-  const targetNorm = normalizeUrl(url);
+    const targetNorm = normalizeUrl(url);
 
-  const existing = db.links.find(l => normalizeUrl(l.url) === targetNorm);
-  if (existing) {
-    return res.status(409).json({
-      error: 'Link already exists',
-      duplicate: true,
-      existingLink: existing
-    });
+    // Duplicate check in Firestore
+    const existingSnap = await db.collection('links')
+      .where('normalizedUrl', '==', targetNorm)
+      .limit(1)
+      .get();
+
+    if (!existingSnap.empty) {
+      const existingDoc = existingSnap.docs[0];
+      return res.status(409).json({
+        error: 'Link already exists',
+        duplicate: true,
+        existingLink: { id: existingDoc.id, ...existingDoc.data() }
+      });
+    }
+
+    const meta = await scrapeMetadata(url);
+    const category = detectCategory(meta.url, meta.title, meta.description);
+    const tags = autoTagLink(category, meta.url, meta.title, meta.description);
+
+    const docId = crypto.randomUUID();
+    const newLink = {
+      id: docId,
+      url: meta.url,
+      normalizedUrl: targetNorm,
+      title: meta.title,
+      description: meta.description,
+      image: meta.image,
+      favicon: meta.favicon,
+      category,
+      tags,
+      notes: '',
+      favorite: false,
+      createdAt: new Date().toISOString()
+    };
+
+    await db.collection('links').doc(docId).set(newLink);
+
+    res.status(201).json(newLink);
+  } catch (err) {
+    console.error('Error creating link in Firestore:', err);
+    res.status(500).json({ error: 'Failed to save link' });
   }
-
-  const meta = await scrapeMetadata(url);
-  const category = detectCategory(meta.url, meta.title, meta.description);
-  const tags = autoTagLink(category, meta.url, meta.title, meta.description);
-
-  const newLink = {
-    id: crypto.randomUUID(),
-    url: meta.url,
-    title: meta.title,
-    description: meta.description,
-    image: meta.image,
-    favicon: meta.favicon,
-    category,
-    tags,
-    notes: '',
-    favorite: false,
-    createdAt: new Date().toISOString()
-  };
-
-  db.links.unshift(newLink);
-  await writeDb(db);
-
-  res.status(201).json(newLink);
 });
 
 // PUT /api/links/:id
 app.put('/api/links/:id', async (req, res) => {
-  const { id } = req.params;
-  const db = await readDb();
-  const index = db.links.findIndex(l => l.id === id);
-  if (index === -1) return res.status(404).json({ error: 'Link not found' });
+  try {
+    const { id } = req.params;
+    const docRef = db.collection('links').doc(id);
+    const docSnap = await docRef.get();
 
-  const { category, tags, notes, favorite, title, description, image } = req.body;
-  if (category !== undefined) db.links[index].category = category;
-  if (tags !== undefined) db.links[index].tags = tags;
-  if (notes !== undefined) db.links[index].notes = notes;
-  if (favorite !== undefined) db.links[index].favorite = favorite;
-  if (title !== undefined) db.links[index].title = title;
-  if (description !== undefined) db.links[index].description = description;
-  if (image !== undefined) db.links[index].image = image;
+    if (!docSnap.exists) {
+      return res.status(404).json({ error: 'Link not found' });
+    }
 
-  await writeDb(db);
-  res.json(db.links[index]);
+    const { category, tags, notes, favorite, title, description, image } = req.body;
+    const updates = {};
+    if (category !== undefined) updates.category = category;
+    if (tags !== undefined) updates.tags = tags;
+    if (notes !== undefined) updates.notes = notes;
+    if (favorite !== undefined) updates.favorite = favorite;
+    if (title !== undefined) updates.title = title;
+    if (description !== undefined) updates.description = description;
+    if (image !== undefined) updates.image = image;
+
+    await docRef.update(updates);
+
+    const updatedSnap = await docRef.get();
+    res.json({ id: updatedSnap.id, ...updatedSnap.data() });
+  } catch (err) {
+    console.error('Error updating link in Firestore:', err);
+    res.status(500).json({ error: 'Failed to update link' });
+  }
 });
 
 // DELETE /api/links/:id
 app.delete('/api/links/:id', async (req, res) => {
-  const { id } = req.params;
-  const db = await readDb();
-  const initialLength = db.links.length;
-  db.links = db.links.filter(l => l.id !== id);
-
-  if (db.links.length === initialLength) {
-    return res.status(404).json({ error: 'Link not found' });
-  }
-
-  await writeDb(db);
-  res.json({ message: 'Link deleted successfully' });
-});
-
-// POST /api/links/sync - Bulk sync/upsert links from client persistent cache
-app.post('/api/links/sync', async (req, res) => {
   try {
-    const rawData = req.body;
-    const incomingLinks = Array.isArray(rawData) ? rawData : (rawData && Array.isArray(rawData.links) ? rawData.links : null);
-    const deletedIds = rawData && Array.isArray(rawData.deletedIds) ? rawData.deletedIds : [];
+    const { id } = req.params;
+    const docRef = db.collection('links').doc(id);
+    const docSnap = await docRef.get();
 
-    if (!incomingLinks) {
-      return res.status(400).json({ error: 'Invalid JSON payload. Expected array of links.' });
+    if (!docSnap.exists) {
+      return res.status(404).json({ error: 'Link not found' });
     }
 
-    const db = await readDb();
-
-    // 1. Remove any links present in deletedIds tombstones
-    if (deletedIds.length > 0) {
-      const deletedSet = new Set(deletedIds);
-      db.links = db.links.filter(l => !deletedSet.has(l.id));
-    }
-
-    // 2. Upsert remaining incoming links
-    for (const link of incomingLinks) {
-      if (!link || (!link.id && !link.url)) continue;
-      if (deletedIds.includes(link.id)) continue;
-
-      const targetNorm = link.url ? normalizeUrl(link.url) : '';
-      const existingIndex = db.links.findIndex(l => (l.id && link.id && l.id === link.id) || (targetNorm && normalizeUrl(l.url) === targetNorm));
-
-      if (existingIndex !== -1) {
-        // Update existing link fields if provided
-        if (link.notes !== undefined) db.links[existingIndex].notes = link.notes;
-        if (link.favorite !== undefined) db.links[existingIndex].favorite = link.favorite;
-        if (link.title !== undefined) db.links[existingIndex].title = link.title;
-        if (link.description !== undefined) db.links[existingIndex].description = link.description;
-        if (link.category !== undefined) db.links[existingIndex].category = link.category;
-        if (link.tags !== undefined) db.links[existingIndex].tags = link.tags;
-        if (link.image !== undefined) db.links[existingIndex].image = link.image;
-        if (link.favicon !== undefined) db.links[existingIndex].favicon = link.favicon;
-      } else {
-        // Unshift new link
-        db.links.unshift({
-          id: link.id || crypto.randomUUID(),
-          url: link.url,
-          title: link.title || link.url,
-          description: link.description || '',
-          image: link.image || '',
-          favicon: link.favicon || '',
-          category: link.category || 'personal',
-          tags: Array.isArray(link.tags) ? link.tags : [],
-          notes: link.notes !== undefined ? link.notes : '',
-          favorite: Boolean(link.favorite),
-          createdAt: link.createdAt || new Date().toISOString()
-        });
-      }
-    }
-
-    await writeDb(db);
-    res.json({ message: 'Sync successful', links: db.links });
+    await docRef.delete();
+    res.json({ message: 'Link deleted successfully' });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to sync link data' });
+    console.error('Error deleting link from Firestore:', err);
+    res.status(500).json({ error: 'Failed to delete link' });
   }
 });
 
-// POST /api/links/import - Batch import links from exported JSON
+// POST /api/links/sync - Legacy sync compatibility endpoint
+app.post('/api/links/sync', async (req, res) => {
+  res.json({ message: 'Firestore is single source of truth' });
+});
+
+// POST /api/links/import - Batch import links into Firestore
 app.post('/api/links/import', async (req, res) => {
   try {
     const rawData = req.body;
@@ -472,17 +424,30 @@ app.post('/api/links/import', async (req, res) => {
       return res.status(400).json({ error: 'Invalid JSON payload. Expected array of links or object with links array.' });
     }
 
-    const db = await readDb();
+    const snapshot = await db.collection('links').get();
+    const existingMap = new Map();
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      existingMap.set(doc.id, doc.id);
+      if (data.normalizedUrl) existingMap.set(data.normalizedUrl, doc.id);
+      if (data.url) existingMap.set(normalizeUrl(data.url), doc.id);
+    });
+
     let addedCount = 0;
+    const batch = db.batch();
 
     for (const link of importedLinks) {
       if (!link || !link.url) continue;
       const norm = normalizeUrl(link.url);
-      const existsIndex = db.links.findIndex(l => (l.id && link.id && l.id === link.id) || normalizeUrl(l.url) === norm);
-      if (existsIndex === -1) {
-        db.links.unshift({
-          id: link.id || crypto.randomUUID(),
+      const existingDocId = (link.id && existingMap.has(link.id)) ? existingMap.get(link.id) : existingMap.get(norm);
+
+      if (!existingDocId) {
+        const newId = link.id || crypto.randomUUID();
+        const docRef = db.collection('links').doc(newId);
+        batch.set(docRef, {
+          id: newId,
           url: link.url,
+          normalizedUrl: norm,
           title: link.title || link.url,
           description: link.description || '',
           image: link.image || '',
@@ -493,20 +458,30 @@ app.post('/api/links/import', async (req, res) => {
           favorite: Boolean(link.favorite),
           createdAt: link.createdAt || new Date().toISOString()
         });
+        existingMap.set(newId, newId);
+        existingMap.set(norm, newId);
         addedCount++;
       } else {
-        if (link.notes !== undefined && link.notes !== '') {
-          db.links[existsIndex].notes = link.notes;
-        }
-        if (link.favorite !== undefined) {
-          db.links[existsIndex].favorite = link.favorite;
+        const docRef = db.collection('links').doc(existingDocId);
+        const updates = {};
+        if (link.notes !== undefined && link.notes !== '') updates.notes = link.notes;
+        if (link.favorite !== undefined) updates.favorite = Boolean(link.favorite);
+        if (Object.keys(updates).length > 0) {
+          batch.update(docRef, updates);
         }
       }
     }
 
-    await writeDb(db);
-    res.json({ message: `Successfully imported ${addedCount} new links!`, count: addedCount, links: db.links });
+    await batch.commit();
+
+    const updatedSnap = await db.collection('links').get();
+    const allLinks = [];
+    updatedSnap.forEach(doc => allLinks.push({ id: doc.id, ...doc.data() }));
+    allLinks.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    res.json({ message: `Successfully imported ${addedCount} new links!`, count: addedCount, links: allLinks });
   } catch (err) {
+    console.error('Error importing links into Firestore:', err);
     res.status(500).json({ error: 'Failed to import link data' });
   }
 });
