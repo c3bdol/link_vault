@@ -1,4 +1,4 @@
-import admin from 'firebase-admin';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import dotenv from 'dotenv';
 
@@ -31,15 +31,15 @@ function checkEnvVars() {
   };
 }
 
-if (!admin.getApps().length) {
+if (!getApps().length) {
   if (emulatorHost) {
-    admin.initializeApp({ projectId: projectId || 'link-vault-demo' });
+    initializeApp({ projectId: projectId || 'link-vault-demo' });
     isInitialized = true;
     console.log(`🔥 Firebase Admin initialized in EMULATOR mode (Host: ${emulatorHost})`);
   } else if (projectId && clientEmail && privateKey) {
     try {
-      admin.initializeApp({
-        credential: admin.credential.cert({
+      initializeApp({
+        credential: cert({
           projectId,
           clientEmail,
           privateKey,
@@ -59,10 +59,12 @@ if (!admin.getApps().length) {
     initError = `Missing Vercel environment variables: ${missing.join(', ')}`;
     console.warn(`⚠️ ${initError}`);
   }
+} else {
+  isInitialized = true;
 }
 
 let dbInstance = null;
-if (isInitialized && admin.getApps().length > 0) {
+if (isInitialized && getApps().length > 0) {
   try {
     dbInstance = getFirestore();
   } catch (e) {
