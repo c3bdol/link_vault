@@ -355,7 +355,7 @@ app.post('/api/links', async (req, res) => {
     res.status(201).json(newLink);
   } catch (err) {
     console.error('Error creating link in Firestore:', err);
-    res.status(500).json({ error: 'Failed to save link' });
+    res.status(500).json({ error: 'Failed to save link', details: err.message });
   }
 });
 
