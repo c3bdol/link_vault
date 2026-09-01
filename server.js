@@ -257,11 +257,20 @@ function normalizeUrl(urlStr) {
   }
 }
 
+function ensureDb(res) {
+  if (!db) {
+    res.status(500).json({ error: 'Firestore database instance is not available. Please verify Firebase environment variables in Vercel settings.' });
+    return false;
+  }
+  return true;
+}
+
 // Routes
 
 // GET /api/links
 app.get('/api/links', async (req, res) => {
   try {
+    if (!ensureDb(res)) return;
     const { category, tag, search, favorite } = req.query;
     const snapshot = await db.collection('links').get();
     
@@ -310,6 +319,7 @@ app.get('/api/preview', async (req, res) => {
 // POST /api/links
 app.post('/api/links', async (req, res) => {
   try {
+    if (!ensureDb(res)) return;
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'URL is required' });
 
@@ -362,6 +372,7 @@ app.post('/api/links', async (req, res) => {
 // PUT /api/links/:id
 app.put('/api/links/:id', async (req, res) => {
   try {
+    if (!ensureDb(res)) return;
     const { id } = req.params;
     const docRef = db.collection('links').doc(id);
     const docSnap = await docRef.get();
@@ -393,6 +404,7 @@ app.put('/api/links/:id', async (req, res) => {
 // DELETE /api/links/:id
 app.delete('/api/links/:id', async (req, res) => {
   try {
+    if (!ensureDb(res)) return;
     const { id } = req.params;
     const docRef = db.collection('links').doc(id);
     const docSnap = await docRef.get();
@@ -417,6 +429,7 @@ app.post('/api/links/sync', async (req, res) => {
 // POST /api/links/import - Batch import links into Firestore
 app.post('/api/links/import', async (req, res) => {
   try {
+    if (!ensureDb(res)) return;
     const rawData = req.body;
     const importedLinks = Array.isArray(rawData) ? rawData : (rawData && Array.isArray(rawData.links) ? rawData.links : null);
     
